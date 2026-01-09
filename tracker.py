@@ -17,9 +17,12 @@ except ImportError:
 # Configuration
 EAR_THRESHOLD = 0.22      # Eye Aspect Ratio threshold for blink
 LONG_BLINK_DURATION = 0.4 # Seconds to count as a "long" blink (click)
+SMOOTHING_FACTOR = 0.15   # Lower = smoother but more lag (0.1 to 0.5 recommended)
+DEADZONE = 2              # Pixels to ignore for micro-movements
 
-# Safe-fail
+# Safe-fail and speed
 pyautogui.FAILSAFE = False
+pyautogui.PAUSE = 0
 
 class EyeTracker:
     def __init__(self):
@@ -48,6 +51,12 @@ class EyeTracker:
         self.click_triggered_left = False
         self.click_triggered_right = False
         self.calibrated = False
+        
+        # Smoothing State
+        self.smooth_x = 0
+        self.smooth_y = 0
+        self.last_mouse_x = 0
+        self.last_mouse_y = 0
         
         # Control State
         self.tracking_active = False
@@ -79,13 +88,34 @@ class EyeTracker:
     def calibrate(self):
         if EYETRAX_AVAILABLE and self.estimator:
             sys.stderr.write("Starting Calibration...\n")
+            # Signal calibration start
+            print(json.dumps({"type": "calibration_event", "status": "start"}))
+            sys.stdout.flush()
+            
             try:
+                # Release camera before calibration to avoid resource contention
+                if self.cap.isOpened():
+                    self.cap.release()
+                
                 # This opens a CV2 window
                 run_9_point_calibration(self.estimator)
                 self.calibrated = True
                 sys.stderr.write("Calibration Complete.\n")
+
             except Exception as e:
                 sys.stderr.write(f"Calibration failed: {e}\n")
+            
+            finally:
+                # Re-initialize camera after calibration
+                if not self.cap.isOpened():
+                    self.cap = cv2.VideoCapture(0)
+                    if not self.cap.isOpened():
+                        sys.stderr.write("Critical: Failed to re-open camera after calibration.\n")
+                
+                # Signal calibration end
+                print(json.dumps({"type": "calibration_event", "status": "end"}))
+                sys.stdout.flush()
+
 
     def calculate_ear(self, landmarks, indices, w, h):
         points = [np.array([landmarks[i].x * w, landmarks[i].y * h]) for i in indices]
@@ -122,15 +152,25 @@ class EyeTracker:
                     features, blink = self.estimator.extract_features(image)
                     if features is not None and not blink and self.calibrated:
                         pred = self.estimator.predict([features])
-                        pred = self.estimator.predict([features])
-                        gaze_x, gaze_y = pred[0]
-                        gaze_x = int(gaze_x)
-                        gaze_y = int(gaze_y)
+                        raw_x, raw_y = pred[0]
                         
-                        # Move Mouse ONLY if active
+                        # Apply smoothing (Exponential Moving Average)
+                        if self.smooth_x == 0 and self.smooth_y == 0:
+                            self.smooth_x, self.smooth_y = raw_x, raw_y
+                        else:
+                            self.smooth_x = self.smooth_x * (1 - SMOOTHING_FACTOR) + raw_x * SMOOTHING_FACTOR
+                            self.smooth_y = self.smooth_y * (1 - SMOOTHING_FACTOR) + raw_y * SMOOTHING_FACTOR
+                        
+                        gaze_x, gaze_y = int(self.smooth_x), int(self.smooth_y)
+                        
+                        # Move Mouse ONLY if active and outside deadzone
                         if self.tracking_active:
-                            sys.stderr.write(f"Moving to {gaze_x}, {gaze_y}\n")
-                            pyautogui.moveTo(gaze_x, gaze_y)
+                            dx = abs(gaze_x - self.last_mouse_x)
+                            dy = abs(gaze_y - self.last_mouse_y)
+                            
+                            if dx >= DEADZONE or dy >= DEADZONE:
+                                pyautogui.moveTo(gaze_x, gaze_y)
+                                self.last_mouse_x, self.last_mouse_y = gaze_x, gaze_y
                     else:
                          # sys.stderr.write("Features None or Blink detected\n")
                          pass

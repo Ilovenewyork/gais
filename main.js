@@ -10,7 +10,8 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 600,
         height: 500,
-        alwaysOnTop: true,
+        alwaysOnTop: false,
+        icon: path.join(__dirname, 'media', 'GAIS_Logo.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -26,12 +27,24 @@ function createWindow() {
 }
 
 function startPythonTracker() {
-    const pythonPath = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
-    const scriptPath = path.join(__dirname, 'tracker.py');
+    let pythonExecutable;
+    let args = [];
 
-    console.log(`Spawning Python: ${pythonPath} ${scriptPath}`);
+    if (app.isPackaged) {
+        pythonExecutable = path.join(process.resourcesPath, 'python', 'venv', 'Scripts', 'python.exe');
+        const scriptPath = path.join(process.resourcesPath, 'python', 'tracker.py');
+        args = [scriptPath]; // Args for python script
 
-    pythonProcess = spawn(pythonPath, [scriptPath]);
+        console.log(`Spawning Packaged Python: ${pythonExecutable} ${args}`);
+        pythonProcess = spawn(pythonExecutable, args, {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+    } else {
+        const pythonPath = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
+        const scriptPath = path.join(__dirname, 'tracker.py');
+        console.log(`Spawning Python: ${pythonPath} ${scriptPath}`);
+        pythonProcess = spawn(pythonPath, [scriptPath]);
+    }
 
     pythonProcess.stdout.on('data', (data) => {
         const lines = data.toString().split('\n');
@@ -40,9 +53,17 @@ function startPythonTracker() {
                 try {
                     const json = JSON.parse(line);
                     if (mainWindow) {
-                        mainWindow.webContents.send('tracker-data', json);
-                        if (json.blink_left) mainWindow.webContents.send('click-event', 'left');
-                        if (json.blink_right) mainWindow.webContents.send('click-event', 'right');
+                        if (json.type === 'calibration_event') {
+                            if (json.status === 'start') {
+                                mainWindow.hide();
+                            } else if (json.status === 'end') {
+                                mainWindow.show();
+                            }
+                        } else {
+                            mainWindow.webContents.send('tracker-data', json);
+                            if (json.blink_left) mainWindow.webContents.send('click-event', 'left');
+                            if (json.blink_right) mainWindow.webContents.send('click-event', 'right');
+                        }
                     }
                 } catch (e) {
                     // console.log('Non-JSON output:', line);

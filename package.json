@@ -4,11 +4,52 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "electron-builder install-app-deps",
+    "pack": "npm run build:python && electron-builder --dir",
+    "dist": "npm run build:python && electron-builder",
+    "build:python": "node scripts/build-python.js"
   },
   "dependencies": {},
   "devDependencies": {
     "cross-env": "^10.1.0",
-    "electron": "^39.2.6"
+    "electron": "^39.2.6",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.gazecursor.app",
+    "productName": "Gaze Cursor",
+    "directories": {
+      "output": "dist/electron"
+    },
+    "files": [
+      "**/*",
+      "!**/__pycache__/*",
+      "!**/*.pyc",
+      "!**/*.py",
+      "!**/*.spec",
+      "!**/build/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "media/GAIS_Logo.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gaze Cursor"
+    },
+    "extraResources": [
+      {
+        "from": "dist/python",
+        "to": "python",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   }
 }
