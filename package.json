@@ -30,6 +30,11 @@
       "!**/*.spec",
       "!**/build/**/*"
     ],
+    "mac": {
+      "target": "dmg",
+      "icon": "media/GAIS_Logo.png",
+      "identity": null
+    },
     "win": {
       "target": "nsis",
       "icon": "media/GAIS_Logo.png",
