@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require('electron');
 
 const path = require('path');
 const { spawn } = require('child_process');
@@ -7,11 +7,14 @@ let mainWindow;
 let pythonProcess;
 
 function createWindow() {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { height } = primaryDisplay.workAreaSize;
+
     mainWindow = new BrowserWindow({
-        width: 600,
-        height: 500,
+        width: 550,
+        height: height,
         alwaysOnTop: false,
-        icon: path.join(__dirname, 'media', 'GAIS_Logo.png'),
+        icon: path.join(__dirname, 'media', 'GAIS_icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -54,6 +57,7 @@ function startPythonTracker() {
                     const json = JSON.parse(line);
                     if (mainWindow) {
                         if (json.type === 'calibration_event') {
+                            mainWindow.webContents.send('calibration-event', json);
                             if (json.status === 'start') {
                                 mainWindow.hide();
                             } else if (json.status === 'end') {
@@ -105,6 +109,9 @@ ipcMain.on('stop-tracking', () => {
 });
 
 app.whenReady().then(() => {
+    if (process.platform === 'win32') {
+        app.setAppUserModelId('com.gazecursor.app');
+    }
     createWindow();
     startPythonTracker();
 

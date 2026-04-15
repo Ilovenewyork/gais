@@ -1,6 +1,8 @@
 {
   "name": "gaze-cursor",
   "version": "1.0.0",
+  "author": "Madhavendra Thakur",
+  "description": "Gaze tracking cursor control application",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -23,21 +25,25 @@
       "output": "dist/electron"
     },
     "files": [
-      "**/*",
+      "index.html",
+      "main.js",
+      "preload.js",
+      "media/**/*",
       "!**/__pycache__/*",
       "!**/*.pyc",
       "!**/*.py",
       "!**/*.spec",
-      "!**/build/**/*"
+      "!venv/**/*",
+      "!dist/**/*"
     ],
     "mac": {
       "target": "dmg",
-      "icon": "media/GAIS_Logo.png",
-      "identity": null
+      "icon": "media/GAIS_icon.png"
     },
     "win": {
       "target": "nsis",
-      "icon": "media/GAIS_Logo.png",
+      "icon": "media/GAIS_icon.png",
+      "publisherName": "Madhavendra Thakur",
       "signAndEditExecutable": false
     },
     "nsis": {
